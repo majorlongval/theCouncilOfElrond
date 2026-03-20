@@ -1,0 +1,25 @@
+name: Run Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent_name:
+        description: "Which agent to run"
+        required: true
+        type: string
+      context:
+        description: "JSON context for the agent"
+        required: false
+        type: string
+        default: "{}"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hello from agent
+        run: |
+          echo "Hello from ${{ inputs.agent_name }}!"
+          echo "Context: ${{ inputs.context }}"
