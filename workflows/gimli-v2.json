@@ -1,0 +1,215 @@
+{
+  "name": "Gimli — Builder Agent v2",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [-640, -576],
+      "id": "6a816bf2-810d-4840-9e92-57c8be360e4f",
+      "name": "Telegram Trigger",
+      "webhookId": "gimli-v2-trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fa22245a-1909-4d1e-b630-557f28f0715e",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/run gimli",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-304, -576],
+      "id": "a4b1d1a5-b31c-4c5b-a77d-e623e4f6b763",
+      "name": "Is /run gimli?"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are Gimli, a builder agent in the Council of Elrond.\n\nYou love building things and shipping code. You take pride in your craft — clean code, passing tests, solid architecture. When there's work to be done, you do it.\n\nYou have tools to interact with the GitHub repo majorlongval/theCouncilOfElrond.\n\nRULES:\n- Be concise and act swiftly.\n- Use at most 2 scouting calls (list issues, read file), then act.\n- Do NOT recursively explore directories. Only read specific files you need.\n- Your deliverable is always a concrete artifact: an issue created, a file read and summarized.\n- When done, summarize what you accomplished in 2-3 sentences.",
+              "role": "model"
+            },
+            {
+              "content": "={{ $('Telegram Trigger').item.json.message.text.replace('/run gimli', '').trim() || 'Check the open issues and decide what to work on. If nothing pressing, read the README.md and suggest what to build next.' }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [48, -608],
+      "id": "8a76e98c-2e09-4c6e-8cbb-6dbe8b8d068d",
+      "name": "Gimli agent"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.content.parts[0].text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [560, -592],
+      "id": "7d3bde54-2c1b-47bd-a7bb-37112e0c8cb0",
+      "name": "Reply to Jord"
+    },
+    {
+      "parameters": {
+        "toolDescription": "List open issues on the GitHub repository. Returns all open issues with their titles and details.",
+        "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/issues?state=open",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [-100, -352],
+      "id": "tool-list-issues",
+      "name": "List Issues"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Create a new GitHub issue. You MUST provide a JSON body with \"title\" (required) and \"body\" (optional) fields. Example: {\"title\": \"My issue title\", \"body\": \"Description of the issue\"}",
+        "method": "POST",
+        "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('JSON', ``, 'json') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [100, -352],
+      "id": "tool-create-issue",
+      "name": "Create Issue"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Read a single file from the GitHub repository. You MUST provide the file path as a query parameter. For example, to read README.md set path to 'README.md'. To read docs/design.md set path to 'docs/design.md'. Only reads ONE file at a time. Do NOT use this to list directories.",
+        "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/contents/{{ $fromAI('filepath', 'The path to the file to read, e.g. README.md or docs/design.md', 'string') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.raw+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [300, -352],
+      "id": "tool-read-file",
+      "name": "Read File"
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is /run gimli?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is /run gimli?": {
+      "main": [
+        [
+          {
+            "node": "Gimli agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gimli agent": {
+      "main": [
+        [
+          {
+            "node": "Reply to Jord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Issues": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gimli agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Issue": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gimli agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read File": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gimli agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
