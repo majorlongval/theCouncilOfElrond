@@ -1,0 +1,150 @@
+{
+  "name": "Telegram Run Agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-240, -112],
+      "id": "3f41b15e-fd12-40e7-9df3-d20b3160167c",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/actions/workflows/run-agent.yml/dispatches",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{}]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=  {\n    \"ref\": \"main\",\n    \"inputs\": {\n      \"agent_name\": \"{{$json.message.text.split(\" \")[1]}}\",\n      \"context\": \"{}\"\n    }\n  }\n    ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [336, -400],
+      "id": "e0d06b7e-4a08-46d1-a121-76e2b7b13340",
+      "name": "HTTP Request",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "QWhuKjoUKqkvwQOj",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [-208, -384],
+      "id": "6a816bf2-810d-4840-9e92-57c8be360e4f",
+      "name": "Telegram Trigger",
+      "webhookId": "4b9fe6ef-5831-4927-9a8b-701ccdaef770",
+      "credentials": {
+        "telegramApi": {
+          "id": "sgMyhYXeaqFAi5kF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fa22245a-1909-4d1e-b630-557f28f0715e",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/run",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [0, -384],
+      "id": "a4b1d1a5-b31c-4c5b-a77d-e623e4f6b763",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ 'Running ' + $('Telegram Trigger').item.json.message.text.split(' ')[1] + '... Check Actions for results.' }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [544, -400],
+      "id": "7d3bde54-2c1b-47bd-a7bb-37112e0c8cb0",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "sgMyhYXeaqFAi5kF",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [[]]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
