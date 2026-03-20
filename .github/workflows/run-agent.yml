@@ -1,8 +1,6 @@
 name: Run Agent
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       agent_name:
