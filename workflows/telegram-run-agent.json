@@ -13,11 +13,9 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/actions/workflows/run-agent.yml/dispatches",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "githubOAuth2Api",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{}]
+          "parameters": [{ "name": "Authorization", "value": "token {{ $env.GITHUB_TOKEN }}" }]
         },
         "sendBody": true,
         "specifyBody": "json",
@@ -28,13 +26,7 @@
       "typeVersion": 4.4,
       "position": [336, -400],
       "id": "e0d06b7e-4a08-46d1-a121-76e2b7b13340",
-      "name": "HTTP Request",
-      "credentials": {
-        "githubOAuth2Api": {
-          "id": "QWhuKjoUKqkvwQOj",
-          "name": "GitHub account"
-        }
-      }
+      "name": "HTTP Request"
     },
     {
       "parameters": {
@@ -46,13 +38,7 @@
       "position": [-208, -384],
       "id": "6a816bf2-810d-4840-9e92-57c8be360e4f",
       "name": "Telegram Trigger",
-      "webhookId": "4b9fe6ef-5831-4927-9a8b-701ccdaef770",
-      "credentials": {
-        "telegramApi": {
-          "id": "sgMyhYXeaqFAi5kF",
-          "name": "Telegram account"
-        }
-      }
+      "webhookId": "4b9fe6ef-5831-4927-9a8b-701ccdaef770"
     },
     {
       "parameters": {
@@ -94,13 +80,7 @@
       "typeVersion": 1.2,
       "position": [544, -400],
       "id": "7d3bde54-2c1b-47bd-a7bb-37112e0c8cb0",
-      "name": "Send a text message",
-      "credentials": {
-        "telegramApi": {
-          "id": "sgMyhYXeaqFAi5kF",
-          "name": "Telegram account"
-        }
-      }
+      "name": "Send a text message"
     }
   ],
   "pinData": {},
