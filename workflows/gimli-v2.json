@@ -89,8 +89,15 @@
       "parameters": {
         "toolDescription": "List open issues on the GitHub repository. Returns all open issues with their titles and details.",
         "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/issues?state=open",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequestTool",
@@ -104,8 +111,15 @@
         "toolDescription": "Create a new GitHub issue. You MUST provide a JSON body with \"title\" (required) and \"body\" (optional) fields. Example: {\"title\": \"My issue title\", \"body\": \"Description of the issue\"}",
         "method": "POST",
         "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/issues",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('JSON', ``, 'json') }}",
@@ -121,14 +135,16 @@
       "parameters": {
         "toolDescription": "Read a single file from the GitHub repository. You MUST provide the file path as a query parameter. For example, to read README.md set path to 'README.md'. To read docs/design.md set path to 'docs/design.md'. Only reads ONE file at a time. Do NOT use this to list directories.",
         "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/contents/{{ $fromAI('filepath', 'The path to the file to read, e.g. README.md or docs/design.md', 'string') }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "githubOAuth2Api",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Accept",
               "value": "application/vnd.github.raw+json"
+            },
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
             }
           ]
         },
