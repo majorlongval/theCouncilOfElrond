@@ -30,7 +30,7 @@ Two long-running containers + one one-shot seeder on a shared Docker network:
 
 - **n8n** (official `n8nio/n8n` image): Workflow engine, UI on port 5678, webhook receiver
 - **n8n-mcp** (`ghcr.io/czlonkowski/n8n-mcp:latest`): MCP server exposing SSE on port 3000. Connects to n8n internally via `http://n8n:5678`
-- **seed** (`curlimages/curl`): One-shot container that imports workflows from `workflows/` into n8n via REST API, then exits
+- **seed** (`alpine:3.19`): One-shot container that imports workflows from `workflows/` into n8n via REST API (installs curl + jq), then exits
 
 ## Services Detail
 
@@ -60,7 +60,7 @@ Two long-running containers + one one-shot seeder on a shared Docker network:
 
 ### seed
 
-- Image: `curlimages/curl`
+- Image: `alpine:3.19` (installs curl + jq at runtime)
 - Volumes: `./workflows:/workflows`, `./scripts:/scripts`
 - Entrypoint: `sh /scripts/seed-workflows.sh`
 - Environment:
@@ -104,16 +104,21 @@ Two long-running containers + one one-shot seeder on a shared Docker network:
 
 Existing workflow JSONs (from n8n Cloud) reference Cloud-specific credential IDs that won't exist in the local instance. Before seeding works correctly, workflows must be migrated:
 
-- Replace n8n credential references with `{{ $env.VAR_NAME }}` expressions
-- For example, Telegram nodes use `{{ $env.TELEGRAM_BOT_TOKEN }}` instead of a `telegramApi` credential ID
-- GitHub API calls use `{{ $env.GITHUB_TOKEN }}` via HTTP Request nodes with `Authorization: Bearer {{ $env.GITHUB_TOKEN }}` headers
-- Gemini API calls use `{{ $env.GEMINI_API_KEY }}`
+**HTTP Request nodes (GitHub API):** Replace `predefinedCredentialType` / `nodeCredentialType` auth with header-based auth using `{{ $env.GITHUB_TOKEN }}`. This works because HTTP Request nodes support arbitrary headers.
+
+**Built-in nodes (Telegram, Google Gemini):** These node types require n8n's credential store — they cannot use raw `$env` expressions. Strategy:
+- Remove Cloud-specific credential IDs from the workflow JSONs so they import cleanly
+- After first import, manually create credentials in the n8n UI and assign them to the relevant nodes
+- Re-export the workflows to capture the local credential references
 
 This migration is a one-time step per workflow. The updated JSONs are committed to `workflows/` and become the source of truth going forward.
 
 ## Credential Handling
 
-All secrets live in `.env` (git-ignored) and are passed to the n8n container as environment variables. Workflows reference them via `{{ $env.VAR_NAME }}` expressions instead of n8n's built-in credential system. This makes workflows portable and reproducible.
+Secrets live in `.env` (git-ignored) and are passed to the n8n container as environment variables.
+
+- **HTTP Request nodes** reference secrets via `{{ $env.VAR_NAME }}` header expressions — fully portable
+- **Built-in nodes** (Telegram, Gemini) use n8n's credential store, configured through the UI — credential references are instance-specific but stable after initial setup
 
 ### .env.example (committed)
 
