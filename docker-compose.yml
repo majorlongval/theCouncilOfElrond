@@ -26,6 +26,8 @@ services:
     env_file: .env
     environment:
       - N8N_API_URL=http://n8n:5678
+      - MCP_MODE=http
+      - AUTH_TOKEN=${MCP_AUTH_TOKEN:-local-dev-token}
       - WEBHOOK_SECURITY_MODE=moderate
     depends_on:
       n8n:

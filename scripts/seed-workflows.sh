@@ -34,8 +34,14 @@ for file in /workflows/*.json; do
 
   workflow_name=$(jq -r '.name' "$file")
 
-  # Force inactive on import
-  workflow_payload=$(jq '.active = false' "$file")
+  # Strip fields the API rejects (read-only, extra properties)
+  # Keep only: name, nodes, connections, settings (cleaned)
+  workflow_payload=$(jq '{
+    name: .name,
+    nodes: .nodes,
+    connections: .connections,
+    settings: (.settings | if . then {executionOrder: .executionOrder} else {} end)
+  }' "$file")
 
   existing_id=$(get_workflow_id_by_name "$workflow_name")
 
