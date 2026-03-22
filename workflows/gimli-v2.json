@@ -47,9 +47,9 @@
       "parameters": {
         "modelId": {
           "__rl": true,
-          "value": "models/gemini-2.0-flash",
+          "value": "models/gemini-flash-latest",
           "mode": "list",
-          "cachedResultName": "models/gemini-2.0-flash"
+          "cachedResultName": "models/gemini-flash-latest"
         },
         "messages": {
           "values": [
