@@ -15,7 +15,7 @@
         "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/actions/workflows/run-agent.yml/dispatches",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "Authorization", "value": "token {{ $env.GITHUB_TOKEN }}" }]
+          "parameters": [{ "name": "Authorization", "value": "=token {{ $env.GITHUB_TOKEN }}" }]
         },
         "sendBody": true,
         "specifyBody": "json",

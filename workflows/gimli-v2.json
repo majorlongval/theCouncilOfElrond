@@ -94,7 +94,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
+              "value": "=token {{ $env.GITHUB_TOKEN }}"
             }
           ]
         },
@@ -116,7 +116,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
+              "value": "=token {{ $env.GITHUB_TOKEN }}"
             }
           ]
         },
@@ -144,7 +144,7 @@
             },
             {
               "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
+              "value": "=token {{ $env.GITHUB_TOKEN }}"
             }
           ]
         },

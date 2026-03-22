@@ -9,7 +9,7 @@ services:
     environment:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5678/
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/"]
       interval: 10s
