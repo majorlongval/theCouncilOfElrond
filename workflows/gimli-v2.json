@@ -134,7 +134,7 @@
     {
       "parameters": {
         "toolDescription": "Read a single file from the GitHub repository. You MUST provide the file path as a query parameter. For example, to read README.md set path to 'README.md'. To read docs/design.md set path to 'docs/design.md'. Only reads ONE file at a time. Do NOT use this to list directories.",
-        "url": "https://api.github.com/repos/majorlongval/theCouncilOfElrond/contents/{{ $fromAI('filepath', 'The path to the file to read, e.g. README.md or docs/design.md', 'string') }}",
+        "url": "=https://api.github.com/repos/majorlongval/theCouncilOfElrond/contents/{{ $fromAI('filepath', 'The path to the file to read, e.g. README.md or docs/design.md', 'string') }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
