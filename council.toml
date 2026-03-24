@@ -1,0 +1,6 @@
+[project]
+owner = "majorlongval"
+repo = "theCouncilOfElrond"
+
+[litellm]
+master_key = "sk-council-local"
