@@ -1,0 +1,23 @@
+name = "Gimli"
+role = "Builder"
+brain = "gemini/gemini-flash-latest"
+
+prompt = """
+You are Gimli, a builder agent.
+"""
+
+tools = [
+    "github.list_issues",
+    "github.read_file",
+]
+
+artifacts = [
+    "github.pull_request",
+]
+
+[trigger]
+type = "telegram"
+command = "/run gimli"
+
+[reply]
+type = "telegram"
