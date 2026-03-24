@@ -20,6 +20,58 @@ services:
     networks:
       - council-net
 
+  seed-config:
+    build:
+      context: .
+      dockerfile: Dockerfile.council
+    command: ["config"]
+    environment:
+      - COUNCIL_AGENTS_DIR=/app/agents
+      - COUNCIL_CONFIG_PATH=/app/council.toml
+      - LITELLM_CONFIG_OUTPUT=/config/litellm_config.yaml
+    volumes:
+      - litellm-config:/config
+    networks:
+      - council-net
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - litellm-config:/config:ro
+    command: ["--config", "/config/litellm_config.yaml", "--port", "4000"]
+    env_file: .env
+    depends_on:
+      seed-config:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - council-net
+
+  seed-deploy:
+    build:
+      context: .
+      dockerfile: Dockerfile.council
+    command: ["deploy"]
+    env_file: .env
+    environment:
+      - N8N_API_URL=http://n8n:5678
+      - COUNCIL_AGENTS_DIR=/app/agents
+      - COUNCIL_CONFIG_PATH=/app/council.toml
+    depends_on:
+      n8n:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    networks:
+      - council-net
+
   n8n-mcp:
     image: ghcr.io/czlonkowski/n8n-mcp:latest
     ports:
@@ -36,20 +88,8 @@ services:
     networks:
       - council-net
 
-  seed:
-    image: alpine:3.19
-    volumes:
-      - ./workflows:/workflows:ro
-      - ./scripts:/scripts:ro
-    entrypoint: ["sh", "/scripts/seed-workflows.sh"]
-    env_file: .env
-    environment:
-      - N8N_API_URL=http://n8n:5678
-    depends_on:
-      n8n:
-        condition: service_healthy
-    networks:
-      - council-net
-
 networks:
   council-net:
+
+volumes:
+  litellm-config:

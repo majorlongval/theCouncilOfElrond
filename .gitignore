@@ -1,2 +1,6 @@
 n8n-data/
 .env
+.venv/
+__pycache__/
+*.egg-info/
+.superpowers/
