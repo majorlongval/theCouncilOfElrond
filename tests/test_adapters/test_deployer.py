@@ -41,7 +41,7 @@ def deployer(transport):
 
 def test_deploy_creates_new_workflow(deployer, transport):
     transport.add_response("POST", "/api/v1/workflows", 201, {"id": "abc123"})
-    transport.add_response("PATCH", "/api/v1/workflows/abc123", 200, {"id": "abc123", "active": True})
+    transport.add_response("POST", "/api/v1/workflows/abc123/activate", 200, {"id": "abc123", "active": True})
 
     workflow = {"name": "Test Workflow", "nodes": [], "connections": {}, "settings": {}}
     result = deployer.deploy(workflow)
@@ -57,7 +57,7 @@ def test_deploy_updates_existing_workflow(deployer, transport):
         "data": [{"id": "existing-id", "name": "Test Workflow"}]
     })
     transport.add_response("PUT", "/api/v1/workflows/existing-id", 200, {"id": "existing-id"})
-    transport.add_response("PATCH", "/api/v1/workflows/existing-id", 200, {"id": "existing-id", "active": True})
+    transport.add_response("POST", "/api/v1/workflows/existing-id/activate", 200, {"id": "existing-id", "active": True})
 
     workflow = {"name": "Test Workflow", "nodes": [], "connections": {}, "settings": {}}
     result = deployer.deploy(workflow)
@@ -69,19 +69,19 @@ def test_deploy_updates_existing_workflow(deployer, transport):
 
 def test_deploy_activates_workflow(deployer, transport):
     transport.add_response("POST", "/api/v1/workflows", 201, {"id": "new-id"})
-    transport.add_response("PATCH", "/api/v1/workflows/new-id", 200, {"id": "new-id", "active": True})
+    transport.add_response("POST", "/api/v1/workflows/new-id/activate", 200, {"id": "new-id", "active": True})
 
     workflow = {"name": "Test", "nodes": [], "connections": {}, "settings": {}}
     deployer.deploy(workflow, activate=True)
 
-    patch_req = next(r for r in transport.requests if r.method == "PATCH")
-    body = json.loads(patch_req.content)
-    assert body["active"] is True
+    # Should have called the activate endpoint (second POST, after the create POST)
+    activate_reqs = [r for r in transport.requests if r.method == "POST" and "activate" in str(r.url)]
+    assert len(activate_reqs) == 1
 
 
 def test_deployer_sends_api_key_header(deployer, transport):
     transport.add_response("POST", "/api/v1/workflows", 201, {"id": "abc"})
-    transport.add_response("PATCH", "/api/v1/workflows/abc", 200, {"id": "abc"})
+    transport.add_response("POST", "/api/v1/workflows/abc/activate", 200, {"id": "abc"})
 
     deployer.deploy({"name": "Test", "nodes": [], "connections": {}, "settings": {}})
 

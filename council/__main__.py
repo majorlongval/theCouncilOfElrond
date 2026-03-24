@@ -60,11 +60,17 @@ def run_deploy(
     deployer = N8nDeployer(client=client, api_key=n8n_api_key)
     cred_manager = N8nCredentialManager(client=client, api_key=n8n_api_key)
 
-    # Ensure LiteLLM credential exists (openAiApi type for the Chat Model node)
+    # Ensure LiteLLM credential exists (openAiApi type for the Chat Model node).
+    # The 'url' field routes all requests to LiteLLM instead of OpenAI.
+    # 'header' must be explicitly False to avoid requiring headerName/headerValue.
     litellm_cred_id = cred_manager.ensure_credential(
         name="LiteLLM Proxy",
         cred_type="openAiApi",
-        data={"apiKey": config.litellm_master_key},
+        data={
+            "apiKey": config.litellm_master_key,
+            "url": "http://litellm:4000/v1",
+            "header": False,
+        },
     )
 
     # Ensure Telegram credential if token is provided

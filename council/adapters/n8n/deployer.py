@@ -62,11 +62,10 @@ class N8nDeployer:
             workflow_id = resp.json()["id"]
 
         if activate:
-            # PATCH is the n8n endpoint for toggling active state without a full replace
-            self._client.patch(
-                f"/api/v1/workflows/{workflow_id}",
+            # n8n uses a dedicated POST endpoint for activation, not PATCH
+            self._client.post(
+                f"/api/v1/workflows/{workflow_id}/activate",
                 headers=self._headers(),
-                json={"active": True},
             )
 
         return workflow_id

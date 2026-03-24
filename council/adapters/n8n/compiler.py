@@ -12,7 +12,6 @@ Workflow shape:
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from council.domain.agent import AgentDefinition
@@ -106,12 +105,22 @@ def _if_node(command: str) -> dict[str, Any]:
 
 
 def _ai_agent_node(agent: AgentDefinition) -> dict[str, Any]:
+    # The Telegram trigger outputs message.text, not chatInput.
+    # We must set promptType="define" and extract the user text explicitly,
+    # stripping the slash command prefix if present.
+    command = agent.trigger.command or ""
     return {
         "name": f"{agent.name} agent",
         "type": "@n8n/n8n-nodes-langchain.agent",
         "typeVersion": 3.1,
         "position": [400, 0],
         "parameters": {
+            "promptType": "define",
+            "text": (
+                f"={{{{ $('Telegram Trigger').item.json.message.text"
+                f".replace('{command}', '').trim() "
+                f"|| 'Check the open issues and decide what to work on.' }}}}"
+            ),
             "options": {
                 "systemMessage": agent.prompt,
             },
