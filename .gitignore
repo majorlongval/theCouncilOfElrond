@@ -4,3 +4,4 @@ n8n-data/
 __pycache__/
 *.egg-info/
 .superpowers/
+__pycache__/
