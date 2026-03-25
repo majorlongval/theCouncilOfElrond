@@ -61,6 +61,8 @@ def _build_nodes(
 
     if has_command:
         nodes.append(_if_node(agent.trigger.command))  # type: ignore[arg-type]
+    else:
+        nodes.append(_negative_command_filter_node())
 
     for tool in tools:
         nodes.append(_tool_node(tool))
@@ -99,6 +101,31 @@ def _if_node(command: str) -> dict[str, Any]:
                         "operator": {
                             "type": "string",
                             "operation": "startsWith",
+                        },
+                    }
+                ],
+            },
+        },
+    }
+
+
+def _negative_command_filter_node() -> dict[str, Any]:
+    """Rejects messages starting with /run — prevents command-less agents from
+    processing messages meant for specific agents like '/run gimli'."""
+    return {
+        "name": "Not a /run command?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [200, 0],
+        "parameters": {
+            "conditions": {
+                "conditions": [
+                    {
+                        "leftValue": "={{ $json.message.text }}",
+                        "rightValue": "/run ",
+                        "operator": {
+                            "type": "string",
+                            "operation": "notStartsWith",
                         },
                     }
                 ],
@@ -249,7 +276,8 @@ def _build_connections(
         # If node true branch (index 0) → Agent
         conns[if_name] = _main_out(agent_name)
     else:
-        conns["Telegram Trigger"] = _main_out(agent_name)
+        conns["Telegram Trigger"] = _main_out("Not a /run command?")
+        conns["Not a /run command?"] = _main_out(agent_name)
 
     # Agent → Reply (always present)
     conns[agent_name] = _main_out("Reply")

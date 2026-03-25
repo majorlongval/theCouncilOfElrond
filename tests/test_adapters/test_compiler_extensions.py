@@ -57,3 +57,34 @@ def test_no_memory_node_when_memory_not_configured():
     workflow = compile_workflow(agent, [])
     memory_nodes = [n for n in workflow["nodes"] if "memoryBufferWindow" in n["type"]]
     assert len(memory_nodes) == 0
+
+
+def test_no_command_agent_gets_negative_filter():
+    agent = _agent_with_memory(memory=None)
+    workflow = compile_workflow(agent, [])
+    if_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.if"]
+    assert len(if_nodes) == 1
+    assert if_nodes[0]["name"] == "Not a /run command?"
+    conditions = if_nodes[0]["parameters"]["conditions"]["conditions"]
+    assert conditions[0]["rightValue"] == "/run "
+    assert conditions[0]["operator"]["operation"] == "notStartsWith"
+
+
+def test_no_command_agent_trigger_routes_through_negative_filter():
+    agent = _agent_with_memory(memory=None)
+    workflow = compile_workflow(agent, [])
+    conns = workflow["connections"]
+    assert conns["Telegram Trigger"]["main"][0][0]["node"] == "Not a /run command?"
+    assert conns["Not a /run command?"]["main"][0][0]["node"] == "Elrond agent"
+
+
+def test_command_agent_does_not_get_negative_filter():
+    agent = _agent_with_memory(
+        name="Gimli",
+        trigger=Trigger(type="telegram", command="/run gimli"),
+        memory=None,
+    )
+    workflow = compile_workflow(agent, [])
+    if_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.if"]
+    assert len(if_nodes) == 1
+    assert if_nodes[0]["name"] == "Is /run gimli?"

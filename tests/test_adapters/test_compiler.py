@@ -68,8 +68,8 @@ def test_workflow_has_correct_node_count(gimli_agent, resolved_tools):
     assert len(workflow["nodes"]) == 8
 
 
-def test_workflow_without_command_skips_if_node(resolved_tools):
-    """When trigger has no command, If node is omitted."""
+def test_workflow_without_command_has_negative_filter(resolved_tools):
+    """When trigger has no command, negative /run filter is added."""
     agent = AgentDefinition(
         name="Elrond",
         role="Director",
@@ -77,15 +77,16 @@ def test_workflow_without_command_skips_if_node(resolved_tools):
         prompt="You are Elrond.",
         tools=["github.list_issues"],
         artifacts=[],
-        trigger=Trigger(type="telegram"),  # no command
+        trigger=Trigger(type="telegram"),
         reply=Reply(type="telegram"),
     )
     workflow = compile_workflow(agent, resolved_tools)
     if_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.if"]
-    assert len(if_nodes) == 0
-    # Trigger connects directly to agent
+    assert len(if_nodes) == 1
+    assert if_nodes[0]["name"] == "Not a /run command?"
     conns = workflow["connections"]
-    assert conns["Telegram Trigger"]["main"][0][0]["node"] == "Elrond agent"
+    assert conns["Telegram Trigger"]["main"][0][0]["node"] == "Not a /run command?"
+    assert conns["Not a /run command?"]["main"][0][0]["node"] == "Elrond agent"
 
 
 def test_workflow_has_telegram_trigger(gimli_agent, resolved_tools):
