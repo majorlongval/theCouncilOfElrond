@@ -1,6 +1,7 @@
 from council.wiring.tools.models import HttpTool, WorkflowTool, Tool
 from council.wiring.tools.github_write import update_file
 from council.wiring.tools.github_pr import read_pr, merge_pr
+from council.wiring.tools.n8n import execute_workflow as execute_workflow_tool
 
 
 def test_workflow_tool_creation():
@@ -51,3 +52,9 @@ def test_merge_pr_tool():
     assert "{pr_number}" in merge_pr.url
     assert "pr_number" in merge_pr.params
     assert merge_pr.auth is not None
+
+
+def test_execute_workflow_tool():
+    assert execute_workflow_tool.name == "Execute Gimli"
+    assert execute_workflow_tool.target_agent == "Gimli"
+    assert isinstance(execute_workflow_tool, WorkflowTool)
