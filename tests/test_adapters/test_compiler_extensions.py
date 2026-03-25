@@ -160,6 +160,7 @@ def test_callable_agent_has_execute_workflow_trigger():
     workflow = compile_workflow(agent, [])
     trigger_nodes = [n for n in workflow["nodes"] if "executeWorkflowTrigger" in n["type"]]
     assert len(trigger_nodes) == 1
+    assert trigger_nodes[0]["parameters"]["inputSource"] == "passthrough"
 
 
 def test_callable_agent_has_two_set_nodes():

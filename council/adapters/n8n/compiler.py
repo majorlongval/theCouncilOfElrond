@@ -223,13 +223,20 @@ def _reply_node(*, callable: bool = False) -> dict[str, Any]:
 
 
 def _execute_workflow_trigger_node() -> dict[str, Any]:
-    """Second entry point — allows other n8n workflows to invoke this agent."""
+    """Second entry point — allows other n8n workflows to invoke this agent.
+
+    Uses 'passthrough' input mode so any JSON payload is accepted without
+    requiring a predefined schema. Our downstream Set nodes handle
+    normalization into the expected {instructions, chat_id} shape.
+    """
     return {
         "name": "Execute Workflow Trigger",
         "type": "n8n-nodes-base.executeWorkflowTrigger",
         "typeVersion": 1.1,
         "position": [0, 200],
-        "parameters": {},
+        "parameters": {
+            "inputSource": "passthrough",
+        },
     }
 
 
