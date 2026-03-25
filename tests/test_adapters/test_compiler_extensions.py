@@ -1,7 +1,7 @@
 import pytest
 
 from council.domain.agent import AgentDefinition, MemoryConfig, Reply, Trigger
-from council.wiring.tools.models import HttpTool, BearerToken
+from council.wiring.tools.models import HttpTool, BearerToken, WorkflowTool
 from council.adapters.n8n.compiler import compile_workflow
 
 
@@ -88,3 +88,49 @@ def test_command_agent_does_not_get_negative_filter():
     if_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.if"]
     assert len(if_nodes) == 1
     assert if_nodes[0]["name"] == "Is /run gimli?"
+
+
+def test_execute_workflow_tool_node_generated():
+    agent = _agent_with_memory(memory=None)
+    wf_tool = WorkflowTool(name="Execute Gimli", description="Trigger Gimli.", target_agent="Gimli")
+    registry = {"Gimli": "wf-123"}
+    workflow = compile_workflow(agent, [wf_tool], workflow_registry=registry)
+    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]
+    assert len(exec_nodes) == 1
+    assert exec_nodes[0]["parameters"]["workflowId"] == "wf-123"
+
+
+def test_execute_workflow_tool_wired_to_agent():
+    agent = _agent_with_memory(memory=None)
+    wf_tool = WorkflowTool(name="Execute Gimli", description="Trigger Gimli.", target_agent="Gimli")
+    registry = {"Gimli": "wf-123"}
+    workflow = compile_workflow(agent, [wf_tool], workflow_registry=registry)
+    conns = workflow["connections"]
+    assert "Execute Gimli" in conns
+    assert conns["Execute Gimli"]["ai_tool"][0][0]["node"] == "Elrond agent"
+
+
+def test_execute_workflow_missing_registry_raises():
+    agent = _agent_with_memory(memory=None)
+    wf_tool = WorkflowTool(name="Execute Gimli", description="Trigger Gimli.", target_agent="Gimli")
+    with pytest.raises(ValueError, match="not found in workflow registry"):
+        compile_workflow(agent, [wf_tool], workflow_registry={})
+
+
+def test_execute_workflow_no_registry_raises():
+    agent = _agent_with_memory(memory=None)
+    wf_tool = WorkflowTool(name="Execute Gimli", description="Trigger Gimli.", target_agent="Gimli")
+    with pytest.raises(ValueError, match="not found in workflow registry"):
+        compile_workflow(agent, [wf_tool])
+
+
+def test_mixed_tools_compile():
+    agent = _agent_with_memory(memory=None)
+    http_tool = _simple_tool()
+    wf_tool = WorkflowTool(name="Execute Gimli", description="Trigger Gimli.", target_agent="Gimli")
+    registry = {"Gimli": "wf-456"}
+    workflow = compile_workflow(agent, [http_tool, wf_tool], workflow_registry=registry)
+    http_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.httpRequestTool"]
+    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]
+    assert len(http_nodes) == 1
+    assert len(exec_nodes) == 1

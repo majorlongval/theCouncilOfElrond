@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from council.domain.agent import AgentDefinition, MemoryConfig
-from council.wiring.tools.models import HttpTool
+from council.wiring.tools.models import HttpTool, Tool, WorkflowTool
 
 
 # ---------------------------------------------------------------------------
@@ -24,13 +24,14 @@ from council.wiring.tools.models import HttpTool
 
 def compile_workflow(
     agent: AgentDefinition,
-    tools: list[HttpTool],
+    tools: list[Tool],
     litellm_base_url: str = "http://litellm:4000/v1",
+    workflow_registry: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Turn an agent definition and its resolved tools into n8n workflow JSON."""
     has_command = agent.trigger.command is not None
 
-    nodes = _build_nodes(agent, tools, litellm_base_url, has_command)
+    nodes = _build_nodes(agent, tools, litellm_base_url, has_command, workflow_registry)
     connections = _build_connections(agent, tools, has_command)
 
     return {
@@ -47,9 +48,10 @@ def compile_workflow(
 
 def _build_nodes(
     agent: AgentDefinition,
-    tools: list[HttpTool],
+    tools: list[Tool],
     litellm_base_url: str,
     has_command: bool,
+    workflow_registry: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Assemble the full node list for this workflow."""
     nodes: list[dict[str, Any]] = [
@@ -65,7 +67,10 @@ def _build_nodes(
         nodes.append(_negative_command_filter_node())
 
     for tool in tools:
-        nodes.append(_tool_node(tool))
+        if isinstance(tool, WorkflowTool):
+            nodes.append(_execute_workflow_tool_node(tool, workflow_registry or {}))
+        else:
+            nodes.append(_tool_node(tool))
 
     if agent.memory is not None:
         nodes.append(_memory_node(agent.memory, callable=agent.callable))
@@ -251,13 +256,33 @@ def _tool_node(tool: HttpTool) -> dict[str, Any]:
     }
 
 
+def _execute_workflow_tool_node(
+    tool: WorkflowTool,
+    workflow_registry: dict[str, str],
+) -> dict[str, Any]:
+    """Build an Execute Workflow tool node from a WorkflowTool model."""
+    if tool.target_agent not in workflow_registry:
+        raise ValueError(
+            f"Agent '{tool.target_agent}' not found in workflow registry — is it deployed?"
+        )
+    return {
+        "name": tool.name,
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1,
+        "position": [400, 400],
+        "parameters": {
+            "workflowId": workflow_registry[tool.target_agent],
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Connection builder
 # ---------------------------------------------------------------------------
 
 def _build_connections(
     agent: AgentDefinition,
-    tools: list[HttpTool],
+    tools: list[Tool],
     has_command: bool,
 ) -> dict[str, Any]:
     """Wire every node together.
