@@ -33,6 +33,18 @@ class Reply(BaseModel):
     type: ReplyType
 
 
+class MemoryConfig(BaseModel):
+    """Short-term memory configuration for an agent's n8n workflow.
+
+    Only "window_buffer" is supported for now — keep the last N messages in
+    context. Storing this here (not in infra) means the domain drives the
+    memory strategy; adapters just wire it up.
+    """
+
+    type: Literal["window_buffer"]
+    window_size: int = 10   # number of prior messages to include in context
+
+
 class AgentDefinition(BaseModel):
     """Complete definition of an agent — the single source of truth.
 
@@ -45,7 +57,10 @@ class AgentDefinition(BaseModel):
     role: str
     brain: str          # LLM identifier in provider/model format, e.g. "gemini/gemini-flash-latest"
     prompt: str
-    tools: list[str]    # Dot-namespaced tool references, e.g. "github.list_issues"
-    artifacts: list[str]
+    tools: list[str] = []       # Dot-namespaced tool references, e.g. "github.list_issues"
+    artifacts: list[str] = []
     trigger: Trigger
     reply: Reply
+    callable: bool = False      # True if other agents/orchestrators may invoke this agent directly
+    orchestrator: bool = False  # True if this agent coordinates other agents rather than doing work itself
+    memory: MemoryConfig | None = None
