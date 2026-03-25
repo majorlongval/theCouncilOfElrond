@@ -58,3 +58,36 @@ def test_execute_workflow_tool():
     assert execute_workflow_tool.name == "Execute Gimli"
     assert execute_workflow_tool.target_agent == "Gimli"
     assert isinstance(execute_workflow_tool, WorkflowTool)
+
+
+from council.wiring.tools import resolve_tool, resolve_tools
+
+
+def test_resolve_n8n_execute_workflow():
+    tool = resolve_tool("n8n.execute_workflow")
+    assert isinstance(tool, WorkflowTool)
+    assert tool.target_agent == "Gimli"
+
+
+def test_resolve_github_update_file():
+    tool = resolve_tool("github_write.update_file")
+    assert isinstance(tool, HttpTool)
+    assert tool.name == "Update File"
+
+
+def test_resolve_github_read_pr():
+    tool = resolve_tool("github_pr.read_pr")
+    assert isinstance(tool, HttpTool)
+    assert tool.name == "Read PR"
+
+
+def test_resolve_github_merge_pr():
+    tool = resolve_tool("github_pr.merge_pr")
+    assert isinstance(tool, HttpTool)
+
+
+def test_resolve_mixed_tools():
+    tools = resolve_tools(["github.list_issues", "n8n.execute_workflow"])
+    assert len(tools) == 2
+    assert isinstance(tools[0], HttpTool)
+    assert isinstance(tools[1], WorkflowTool)

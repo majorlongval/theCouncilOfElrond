@@ -1,15 +1,17 @@
 from council.config import ProjectConfig
-from council.wiring.tools.models import HttpTool
+from council.wiring.tools.models import HttpTool, Tool
 
 
-def resolve_tool_urls(tools: list[HttpTool], config: ProjectConfig) -> list[HttpTool]:
+def resolve_tool_urls(tools: list[Tool], config: ProjectConfig) -> list[Tool]:
     """Resolve project-level placeholders ({owner}, {repo}) in tool URLs.
 
-    AI-provided params (those in tool.params) are left as placeholders
-    for the compiler to convert to $fromAI() expressions.
+    WorkflowTool instances are passed through unchanged — they have no URL.
     """
-    resolved: list[HttpTool] = []
+    resolved: list[Tool] = []
     for tool in tools:
-        url = tool.url.replace("{owner}", config.owner).replace("{repo}", config.repo)
-        resolved.append(tool.model_copy(update={"url": url}))
+        if isinstance(tool, HttpTool):
+            url = tool.url.replace("{owner}", config.owner).replace("{repo}", config.repo)
+            resolved.append(tool.model_copy(update={"url": url}))
+        else:
+            resolved.append(tool)
     return resolved
