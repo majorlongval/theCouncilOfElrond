@@ -54,17 +54,26 @@ def _build_nodes(
     workflow_registry: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Assemble the full node list for this workflow."""
+    is_callable = agent.callable
+
     nodes: list[dict[str, Any]] = [
         _telegram_trigger_node(),
-        _ai_agent_node(agent),
+        _ai_agent_node(agent, callable=is_callable),
         _chat_model_node(agent.brain, litellm_base_url),
-        _reply_node(),
+        _reply_node(callable=is_callable),
     ]
 
     if has_command:
         nodes.append(_if_node(agent.trigger.command))  # type: ignore[arg-type]
     else:
         nodes.append(_negative_command_filter_node())
+
+    # Callable agents get a second entry point and normalization Set nodes
+    if is_callable:
+        nodes.append(_execute_workflow_trigger_node())
+        nodes.append(_normalize_telegram_set_node(agent.trigger.command))
+        nodes.append(_normalize_workflow_set_node())
+        nodes.append(_reply_if_guard_node())
 
     for tool in tools:
         if isinstance(tool, WorkflowTool):
@@ -73,7 +82,7 @@ def _build_nodes(
             nodes.append(_tool_node(tool))
 
     if agent.memory is not None:
-        nodes.append(_memory_node(agent.memory, callable=agent.callable))
+        nodes.append(_memory_node(agent.memory, callable=is_callable))
 
     return nodes
 
@@ -139,11 +148,21 @@ def _negative_command_filter_node() -> dict[str, Any]:
     }
 
 
-def _ai_agent_node(agent: AgentDefinition) -> dict[str, Any]:
-    # The Telegram trigger outputs message.text, not chatInput.
-    # We must set promptType="define" and extract the user text explicitly,
-    # stripping the slash command prefix if present.
-    command = agent.trigger.command or ""
+def _ai_agent_node(agent: AgentDefinition, *, callable: bool = False) -> dict[str, Any]:
+    """AI Agent node.
+
+    When callable, input comes from the normalized Set nodes ($json.instructions).
+    Otherwise, it reads directly from the Telegram Trigger.
+    """
+    if callable:
+        text = "={{ $json.instructions || 'Check the open issues and decide what to work on.' }}"
+    else:
+        command = agent.trigger.command or ""
+        text = (
+            f"={{{{ $('Telegram Trigger').item.json.message.text"
+            f".replace('{command}', '').trim() "
+            f"|| 'Check the open issues and decide what to work on.' }}}}"
+        )
     return {
         "name": f"{agent.name} agent",
         "type": "@n8n/n8n-nodes-langchain.agent",
@@ -151,11 +170,7 @@ def _ai_agent_node(agent: AgentDefinition) -> dict[str, Any]:
         "position": [400, 0],
         "parameters": {
             "promptType": "define",
-            "text": (
-                f"={{{{ $('Telegram Trigger').item.json.message.text"
-                f".replace('{command}', '').trim() "
-                f"|| 'Check the open issues and decide what to work on.' }}}}"
-            ),
+            "text": text,
             "options": {
                 "systemMessage": agent.prompt,
             },
@@ -183,15 +198,107 @@ def _chat_model_node(brain: str, litellm_base_url: str) -> dict[str, Any]:
     }
 
 
-def _reply_node() -> dict[str, Any]:
+def _reply_node(*, callable: bool = False) -> dict[str, Any]:
+    """Reply node sends the agent's output back via Telegram.
+
+    When callable, the chat_id comes from the normalized Set node rather than
+    directly from the Telegram Trigger — this allows headless invocations to
+    skip replying when no chat_id is provided.
+    """
+    chat_id = (
+        "={{ $json.chat_id }}"
+        if callable
+        else "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+    )
     return {
         "name": "Reply",
         "type": "n8n-nodes-base.telegram",
         "typeVersion": 1.2,
         "position": [600, 0],
         "parameters": {
-            "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+            "chatId": chat_id,
             "text": "={{ $json.output }}",
+        },
+    }
+
+
+def _execute_workflow_trigger_node() -> dict[str, Any]:
+    """Second entry point — allows other n8n workflows to invoke this agent."""
+    return {
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 200],
+        "parameters": {},
+    }
+
+
+def _normalize_telegram_set_node(command: str | None) -> dict[str, Any]:
+    """Extract instructions and chat_id from the Telegram message payload.
+
+    Strips the slash command prefix (if any) so downstream nodes receive
+    clean user text in a uniform shape.
+    """
+    strip_expr = f".replace('{command}', '').trim()" if command else ".trim()"
+    return {
+        "name": "Normalize Telegram Input",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [200, 0],
+        "parameters": {
+            "assignments": {
+                "assignments": [
+                    {"name": "instructions", "value": f"={{{{ $json.message.text{strip_expr} }}}}", "type": "string"},
+                    {"name": "chat_id", "value": "={{ $json.message.chat.id }}", "type": "string"},
+                ]
+            }
+        },
+    }
+
+
+def _normalize_workflow_set_node() -> dict[str, Any]:
+    """Pass-through normalization for Execute Workflow inputs.
+
+    The calling workflow is expected to provide `instructions` and optionally
+    `chat_id`. This Set node ensures the fields exist with consistent names.
+    """
+    return {
+        "name": "Normalize Workflow Input",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [200, 200],
+        "parameters": {
+            "assignments": {
+                "assignments": [
+                    {"name": "instructions", "value": "={{ $json.instructions }}", "type": "string"},
+                    {"name": "chat_id", "value": "={{ $json.chat_id }}", "type": "string"},
+                ]
+            }
+        },
+    }
+
+
+def _reply_if_guard_node() -> dict[str, Any]:
+    """Gate before the Reply node — skips sending when there is no chat_id.
+
+    Headless (workflow-triggered) executions may not have a chat_id, so
+    we must not attempt to send a Telegram message in that case.
+    """
+    return {
+        "name": "Has chat_id?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [600, 0],
+        "parameters": {
+            "conditions": {
+                "conditions": [
+                    {
+                        "leftValue": "={{ $json.chat_id }}",
+                        "rightValue": "",
+                        "operator": {"type": "string", "operation": "notEquals"},
+                    }
+                ],
+            },
         },
     }
 
@@ -287,25 +394,48 @@ def _build_connections(
 ) -> dict[str, Any]:
     """Wire every node together.
 
-    Main flow: Trigger → [If] → Agent → Reply
+    Non-callable flow: Trigger → [If] → Agent → Reply
+    Callable flow:     Trigger → Normalize Telegram → [If] → Agent → Has chat_id? → Reply
+                       Execute Workflow Trigger → Normalize Workflow → [If] → Agent → Has chat_id? → Reply
+
     Sub-connections: ChatModel →(ai_languageModel)→ Agent
                      Tools     →(ai_tool)→ Agent
     """
     agent_name = f"{agent.name} agent"
+    is_callable = agent.callable
     conns: dict[str, Any] = {}
 
-    # -- Main flow
-    if has_command:
-        if_name = f"Is {agent.trigger.command}?"
-        conns["Telegram Trigger"] = _main_out(if_name)
-        # If node true branch (index 0) → Agent
-        conns[if_name] = _main_out(agent_name)
-    else:
-        conns["Telegram Trigger"] = _main_out("Not a /run command?")
-        conns["Not a /run command?"] = _main_out(agent_name)
+    if is_callable:
+        # -- Callable: both triggers feed through normalization Set nodes
+        conns["Telegram Trigger"] = _main_out("Normalize Telegram Input")
+        conns["Execute Workflow Trigger"] = _main_out("Normalize Workflow Input")
 
-    # Agent → Reply (always present)
-    conns[agent_name] = _main_out("Reply")
+        # The target after normalization is either the If command gate or the Agent directly
+        if has_command:
+            if_name = f"Is {agent.trigger.command}?"
+            normalize_target = if_name
+            conns[if_name] = _main_out(agent_name)
+        else:
+            normalize_target = "Not a /run command?"
+            conns["Not a /run command?"] = _main_out(agent_name)
+
+        conns["Normalize Telegram Input"] = _main_out(normalize_target)
+        conns["Normalize Workflow Input"] = _main_out(normalize_target)
+
+        # Agent → Has chat_id? → Reply (guard against headless calls)
+        conns[agent_name] = _main_out("Has chat_id?")
+        conns["Has chat_id?"] = _main_out("Reply")
+    else:
+        # -- Non-callable: original direct wiring
+        if has_command:
+            if_name = f"Is {agent.trigger.command}?"
+            conns["Telegram Trigger"] = _main_out(if_name)
+            conns[if_name] = _main_out(agent_name)
+        else:
+            conns["Telegram Trigger"] = _main_out("Not a /run command?")
+            conns["Not a /run command?"] = _main_out(agent_name)
+
+        conns[agent_name] = _main_out("Reply")
 
     # -- Chat Model → Agent (always present)
     conns["Chat Model"] = {

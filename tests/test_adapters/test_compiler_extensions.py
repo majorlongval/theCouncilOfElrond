@@ -134,3 +134,94 @@ def test_mixed_tools_compile():
     exec_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]
     assert len(http_nodes) == 1
     assert len(exec_nodes) == 1
+
+
+# ---------------------------------------------------------------------------
+# Callable agent helpers and tests (Task 9)
+# ---------------------------------------------------------------------------
+
+def _callable_agent(**overrides) -> AgentDefinition:
+    defaults = {
+        "name": "Gimli",
+        "role": "Builder",
+        "brain": "gemini/gemini-flash-latest",
+        "prompt": "You are Gimli.",
+        "tools": [],
+        "trigger": Trigger(type="telegram", command="/run gimli"),
+        "reply": Reply(type="telegram"),
+        "callable": True,
+    }
+    defaults.update(overrides)
+    return AgentDefinition(**defaults)
+
+
+def test_callable_agent_has_execute_workflow_trigger():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    trigger_nodes = [n for n in workflow["nodes"] if "executeWorkflowTrigger" in n["type"]]
+    assert len(trigger_nodes) == 1
+
+
+def test_callable_agent_has_two_set_nodes():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    set_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.set"]
+    assert len(set_nodes) == 2
+    set_names = {n["name"] for n in set_nodes}
+    assert "Normalize Telegram Input" in set_names
+    assert "Normalize Workflow Input" in set_names
+
+
+def test_callable_agent_text_reads_from_normalized_input():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    agent_node = next(n for n in workflow["nodes"] if "langchain.agent" in n["type"])
+    assert "$json.instructions" in agent_node["parameters"]["text"]
+
+
+def test_callable_agent_reply_reads_normalized_chat_id():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    reply_nodes = [n for n in workflow["nodes"] if n["name"] == "Reply"]
+    assert len(reply_nodes) == 1
+    assert "$json.chat_id" in reply_nodes[0]["parameters"]["chatId"]
+
+
+def test_callable_agent_has_reply_if_guard():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    if_nodes = [n for n in workflow["nodes"] if n.get("name") == "Has chat_id?"]
+    assert len(if_nodes) == 1
+    conns = workflow["connections"]
+    assert conns[f"{agent.name} agent"]["main"][0][0]["node"] == "Has chat_id?"
+    assert conns["Has chat_id?"]["main"][0][0]["node"] == "Reply"
+
+
+def test_callable_agent_connections_telegram_path():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    conns = workflow["connections"]
+    assert conns["Telegram Trigger"]["main"][0][0]["node"] == "Normalize Telegram Input"
+
+
+def test_callable_agent_connections_workflow_trigger_path():
+    agent = _callable_agent()
+    workflow = compile_workflow(agent, [])
+    conns = workflow["connections"]
+    assert conns["Execute Workflow Trigger"]["main"][0][0]["node"] == "Normalize Workflow Input"
+
+
+def test_non_callable_agent_has_no_execute_workflow_trigger():
+    agent = _agent_with_memory(memory=None)
+    workflow = compile_workflow(agent, [])
+    trigger_nodes = [n for n in workflow["nodes"] if "executeWorkflowTrigger" in n["type"]]
+    assert len(trigger_nodes) == 0
+
+
+def test_non_callable_agent_has_no_reply_if_guard():
+    agent = _agent_with_memory(memory=None)
+    workflow = compile_workflow(agent, [])
+    if_nodes = [n for n in workflow["nodes"] if n.get("name") == "Has chat_id?"]
+    assert len(if_nodes) == 0
+    conns = workflow["connections"]
+    assert conns["Elrond agent"]["main"][0][0]["node"] == "Reply"
