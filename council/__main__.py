@@ -29,6 +29,25 @@ def run_config(
     print(f"[council] Generated LiteLLM config with {len(agents)} agent(s) → {output_path}")
 
 
+def _inject_credentials(
+    workflow: dict,
+    telegram_cred_id: str | None,
+    litellm_cred_id: str,
+) -> None:
+    """Inject credential references into workflow nodes.
+
+    Mutates the workflow dict in-place — n8n requires credential IDs to be
+    embedded in each node rather than passed separately at deploy time.
+    """
+    for node in workflow["nodes"]:
+        if node["type"] == "n8n-nodes-base.telegramTrigger" and telegram_cred_id:
+            node["credentials"] = {"telegramApi": {"id": telegram_cred_id, "name": "Telegram account"}}
+        elif node["type"] == "n8n-nodes-base.telegram" and telegram_cred_id:
+            node["credentials"] = {"telegramApi": {"id": telegram_cred_id, "name": "Telegram account"}}
+        elif node["type"] == "@n8n/n8n-nodes-langchain.lmChatOpenAi":
+            node["credentials"] = {"openAiApi": {"id": litellm_cred_id, "name": "LiteLLM Proxy"}}
+
+
 def run_deploy(
     agents_dir: Path,
     config_path: Path,
@@ -82,21 +101,30 @@ def run_deploy(
             data={"accessToken": telegram_token},
         )
 
-    for agent in agents:
+    # Split agents into workers and orchestrators
+    workers = [a for a in agents if not a.orchestrator]
+    orchestrators = [a for a in agents if a.orchestrator]
+
+    # Pass 1: Deploy workers, build workflow registry
+    workflow_registry: dict[str, str] = {}
+    for agent in workers:
         print(f"[council] Deploying '{agent.name}'...")
         tools = resolve_tools(agent.tools)
         tools = resolve_tool_urls(tools, config)
         workflow = compile_workflow(agent, tools)
+        _inject_credentials(workflow, telegram_cred_id, litellm_cred_id)
+        workflow_id = deployer.deploy(workflow)
+        workflow_registry[agent.name] = workflow_id
+        print(f"[council] Deployed '{agent.name}' (id: {workflow_id})")
 
-        # Inject credential references into nodes
-        for node in workflow["nodes"]:
-            if node["type"] == "n8n-nodes-base.telegramTrigger" and telegram_cred_id:
-                node["credentials"] = {"telegramApi": {"id": telegram_cred_id, "name": "Telegram account"}}
-            elif node["type"] == "n8n-nodes-base.telegram" and telegram_cred_id:
-                node["credentials"] = {"telegramApi": {"id": telegram_cred_id, "name": "Telegram account"}}
-            elif node["type"] == "@n8n/n8n-nodes-langchain.lmChatOpenAi":
-                node["credentials"] = {"openAiApi": {"id": litellm_cred_id, "name": "LiteLLM Proxy"}}
-
+    # Pass 2: Deploy orchestrators with workflow registry so they can reference
+    # worker workflow IDs via executeWorkflow nodes.
+    for agent in orchestrators:
+        print(f"[council] Deploying orchestrator '{agent.name}'...")
+        tools = resolve_tools(agent.tools)
+        tools = resolve_tool_urls(tools, config)
+        workflow = compile_workflow(agent, tools, workflow_registry=workflow_registry)
+        _inject_credentials(workflow, telegram_cred_id, litellm_cred_id)
         workflow_id = deployer.deploy(workflow)
         print(f"[council] Deployed '{agent.name}' (id: {workflow_id})")
 
