@@ -174,9 +174,14 @@ class WorkflowTool(BaseModel):
     target_agent: str  # agent name, resolved to workflow ID at deploy time
 ```
 
-The tool registry's `resolve_tool()` currently returns `HttpTool`. Change it to return `HttpTool | WorkflowTool` (a union type `Tool = HttpTool | WorkflowTool`). The compiler dispatches based on type: `isinstance(tool, HttpTool)` → `_tool_node()`, `isinstance(tool, WorkflowTool)` → `_execute_workflow_tool_node()`.
+The tool registry's `resolve_tool()` currently returns `HttpTool` and validates with `isinstance(tool, HttpTool)`. Change it to:
+- Define `Tool = HttpTool | WorkflowTool` union type in `models.py`.
+- `resolve_tool()` returns `Tool` and validates with `isinstance(tool, (HttpTool, WorkflowTool))`.
+- `resolve_tools()` returns `list[Tool]`.
+- The compiler dispatches based on type: `isinstance(tool, HttpTool)` → `_tool_node()`, `isinstance(tool, WorkflowTool)` → `_execute_workflow_tool_node()`.
+- Internal helpers (`_build_nodes`, `_build_connections`) update their type signatures to accept `list[Tool]`.
 
-The `n8n.execute_workflow` module exports a factory function rather than a static instance, since the target agent name may vary:
+The `n8n.execute_workflow` module exports a static instance (same pattern as the GitHub tools):
 
 ```python
 # council/wiring/tools/n8n.py
@@ -270,9 +275,79 @@ def _execute_workflow_tool_node(tool: WorkflowTool, workflow_registry: dict[str,
 
 If `tool.target_agent` is missing from the registry, raise a `ValueError` with a clear message ("Agent 'X' not found in workflow registry — is it deployed?"). This catches typos and ordering bugs at deploy time.
 
-### 4. Default trigger routing
+### 4. Default trigger routing and negative command filter
 
-Elrond has no `command`, so no If node. Telegram Trigger wires directly to the AI Agent. This already works in the current compiler.
+Elrond has no `command`. In the current compiler this means no If node — Telegram Trigger wires directly to the AI Agent. However, with multiple agents on the same Telegram bot, Elrond must NOT process `/run` messages meant for other agents.
+
+The compiler adds a negative-filter If node for agents without a `command`: rejects messages starting with `/run `. This ensures Elrond ignores messages like `/run gimli` that are meant for Gimli.
+
+```python
+def _negative_command_filter_node() -> dict[str, Any]:
+    return {
+        "name": "Not a /run command?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [200, 0],
+        "parameters": {
+            "conditions": {
+                "conditions": [
+                    {
+                        "leftValue": "={{ $json.message.text }}",
+                        "rightValue": "/run ",
+                        "operator": {
+                            "type": "string",
+                            "operation": "notStartsWith",
+                        },
+                    }
+                ],
+            },
+        },
+    }
+```
+
+Flow: Telegram Trigger → "Not a /run command?" → (true) → AI Agent.
+
+### 5. Dual-path Set nodes for callable agents
+
+When `callable = true`, the compiler adds Set nodes to normalize input from both trigger paths:
+
+**Telegram Set node:**
+```python
+{
+    "name": "Normalize Telegram Input",
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [200, 0],
+    "parameters": {
+        "assignments": {
+            "assignments": [
+                {"name": "instructions", "value": "={{ $json.message.text.replace('/run gimli', '').trim() }}", "type": "string"},
+                {"name": "chat_id", "value": "={{ $json.message.chat.id }}", "type": "string"},
+            ]
+        }
+    },
+}
+```
+
+**Execute Workflow Set node:**
+```python
+{
+    "name": "Normalize Workflow Input",
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [200, 200],
+    "parameters": {
+        "assignments": {
+            "assignments": [
+                {"name": "instructions", "value": "={{ $json.instructions }}", "type": "string"},
+                {"name": "chat_id", "value": "={{ $json.chat_id }}", "type": "string"},
+            ]
+        }
+    },
+}
+```
+
+Both Set nodes connect to the downstream flow (If node or AI Agent). The AI Agent reads `{{ $json.instructions }}` and the Reply node reads `{{ $json.chat_id }}`.
 
 ## Domain Model Changes
 
