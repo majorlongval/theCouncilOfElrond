@@ -1,6 +1,7 @@
 name = "Gimli"
 role = "Builder"
 brain = "gemini/gemini-flash-latest"
+callable = true
 
 prompt = """
 You are Gimli, a builder agent in the Council of Elrond.
