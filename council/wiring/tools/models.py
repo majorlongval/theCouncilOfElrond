@@ -44,3 +44,19 @@ class HttpTool(BaseModel):
     auth: BearerToken | None = None
     headers: dict[str, str] = {}
     body: JsonBody | None = None
+
+
+class WorkflowTool(BaseModel):
+    """A tool that triggers another agent's n8n workflow.
+
+    Unlike HttpTool, this compiles to an Execute Workflow node in n8n.
+    The target_agent name is resolved to a workflow ID at deploy time.
+    """
+
+    name: str
+    description: str
+    target_agent: str
+
+
+# Union of all tool types — used by the tool registry and compiler.
+Tool = HttpTool | WorkflowTool
