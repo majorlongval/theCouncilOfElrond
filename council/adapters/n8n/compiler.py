@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from council.domain.agent import AgentDefinition
+from council.domain.agent import AgentDefinition, MemoryConfig
 from council.wiring.tools.models import HttpTool
 
 
@@ -64,6 +64,9 @@ def _build_nodes(
 
     for tool in tools:
         nodes.append(_tool_node(tool))
+
+    if agent.memory is not None:
+        nodes.append(_memory_node(agent.memory, callable=agent.callable))
 
     return nodes
 
@@ -161,6 +164,31 @@ def _reply_node() -> dict[str, Any]:
     }
 
 
+def _memory_node(memory: MemoryConfig, callable: bool) -> dict[str, Any]:
+    """Window buffer memory — gives the agent short-term conversation context.
+
+    The session key identifies which conversation's history to load. For
+    non-callable agents the chat_id comes directly from the Telegram trigger;
+    callable agents receive it via a Set node (Task 9 wires that path).
+    """
+    session_key = (
+        "={{ $json.chat_id }}"
+        if callable
+        else "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+    )
+    return {
+        "name": "Chat Memory",
+        "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+        "typeVersion": 1.3,
+        "position": [400, 300],
+        "parameters": {
+            "sessionIdType": "customKey",
+            "sessionKey": session_key,
+            "contextWindowLength": memory.window_size,
+        },
+    }
+
+
 def _tool_node(tool: HttpTool) -> dict[str, Any]:
     """Build an httpRequestTool node from a resolved HttpTool model."""
     url = _resolve_tool_url(tool)
@@ -235,6 +263,12 @@ def _build_connections(
     for tool in tools:
         conns[tool.name] = {
             "ai_tool": [[{"node": agent_name, "type": "ai_tool", "index": 0}]],
+        }
+
+    # -- Memory → Agent (optional)
+    if agent.memory is not None:
+        conns["Chat Memory"] = {
+            "ai_memory": [[{"node": agent_name, "type": "ai_memory", "index": 0}]],
         }
 
     return conns
