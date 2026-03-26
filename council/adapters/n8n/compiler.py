@@ -302,7 +302,7 @@ def _reply_if_guard_node() -> dict[str, Any]:
                     {
                         "leftValue": "={{ $json.chat_id }}",
                         "rightValue": "",
-                        "operator": {"type": "string", "operation": "notEquals"},
+                        "operator": {"type": "string", "operation": "exists"},
                     }
                 ],
             },
@@ -402,6 +402,7 @@ def _execute_workflow_tool_node(
                 "mappingMode": "defineBelow",
                 "value": {
                     "instructions": "={{ $fromAI('instructions', 'The task instructions to pass to the sub-workflow', 'string') }}",
+                    "chat_id": "={{ $json.chat_id }}",
                 },
                 "schema": [
                     {
@@ -410,6 +411,15 @@ def _execute_workflow_tool_node(
                         "display": True,
                         "required": True,
                         "displayName": "instructions",
+                        "defaultMatch": False,
+                        "canBeUsedToMatch": True,
+                    },
+                    {
+                        "id": "chat_id",
+                        "type": "string",
+                        "display": True,
+                        "required": False,
+                        "displayName": "chat_id",
                         "defaultMatch": False,
                         "canBeUsedToMatch": True,
                     },
