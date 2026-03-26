@@ -1,6 +1,6 @@
 name = "Elrond"
 role = "Head of the Council"
-brain = "gemini/gemini-2.5-pro-preview-05-06"
+brain = "gemini/gemini-2.5-pro-preview-04-17"
 orchestrator = true
 
 prompt = """
