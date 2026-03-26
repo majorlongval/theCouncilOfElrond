@@ -1,3 +1,5 @@
+import time
+
 import httpx
 
 
@@ -62,10 +64,24 @@ class N8nDeployer:
             workflow_id = resp.json()["id"]
 
         if activate:
+            self._activate_with_retry(workflow_id)
+
+        return workflow_id
+
+    def _activate_with_retry(self, workflow_id: str, retries: int = 3, delay: float = 2.0) -> None:
+        """Activate a workflow, retrying on failure.
+
+        Sub-workflow references may fail validation if a dependency was just
+        published. A short retry loop handles this race condition.
+        """
+        for attempt in range(retries):
             resp = self._client.post(
                 f"/api/v1/workflows/{workflow_id}/activate",
                 headers=self._headers(),
             )
-            resp.raise_for_status()
-
-        return workflow_id
+            if resp.is_success:
+                return
+            if attempt < retries - 1:
+                time.sleep(delay)
+        # Final attempt failed — raise with error details
+        resp.raise_for_status()

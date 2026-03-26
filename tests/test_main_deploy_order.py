@@ -41,6 +41,6 @@ def test_orchestrator_receives_workflow_registry():
     registry = {"Gimli": "gimli-wf-id"}
 
     workflow = compile_workflow(elrond, [wf_tool], workflow_registry=registry)
-    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]
+    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "@n8n/n8n-nodes-langchain.toolWorkflow"]
     assert len(exec_nodes) == 1
-    assert exec_nodes[0]["parameters"]["workflowId"] == "gimli-wf-id"
+    assert exec_nodes[0]["parameters"]["workflowId"]["value"] == "gimli-wf-id"

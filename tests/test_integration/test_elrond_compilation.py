@@ -29,7 +29,7 @@ def test_elrond_workflow_compiles():
     assert "@n8n/n8n-nodes-langchain.lmChatOpenAi" in node_types
     assert "n8n-nodes-base.telegram" in node_types  # Reply
     assert "@n8n/n8n-nodes-langchain.memoryBufferWindow" in node_types
-    assert "n8n-nodes-base.executeWorkflow" in node_types
+    assert "@n8n/n8n-nodes-langchain.toolWorkflow" in node_types
 
     json_str = json.dumps(workflow)
     assert json.loads(json_str) == workflow

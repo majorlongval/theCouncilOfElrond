@@ -95,9 +95,10 @@ def test_execute_workflow_tool_node_generated():
     wf_tool = WorkflowTool(name="Execute Gimli", description="Trigger Gimli.", target_agent="Gimli")
     registry = {"Gimli": "wf-123"}
     workflow = compile_workflow(agent, [wf_tool], workflow_registry=registry)
-    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]
+    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "@n8n/n8n-nodes-langchain.toolWorkflow"]
     assert len(exec_nodes) == 1
-    assert exec_nodes[0]["parameters"]["workflowId"] == "wf-123"
+    assert exec_nodes[0]["parameters"]["workflowId"]["value"] == "wf-123"
+    assert exec_nodes[0]["parameters"]["source"] == "database"
 
 
 def test_execute_workflow_tool_wired_to_agent():
@@ -131,7 +132,7 @@ def test_mixed_tools_compile():
     registry = {"Gimli": "wf-456"}
     workflow = compile_workflow(agent, [http_tool, wf_tool], workflow_registry=registry)
     http_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.httpRequestTool"]
-    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]
+    exec_nodes = [n for n in workflow["nodes"] if n["type"] == "@n8n/n8n-nodes-langchain.toolWorkflow"]
     assert len(http_nodes) == 1
     assert len(exec_nodes) == 1
 

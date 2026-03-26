@@ -374,18 +374,49 @@ def _execute_workflow_tool_node(
     tool: WorkflowTool,
     workflow_registry: dict[str, str],
 ) -> dict[str, Any]:
-    """Build an Execute Workflow tool node from a WorkflowTool model."""
+    """Build a Sub-Workflow Tool node from a WorkflowTool model.
+
+    Uses the langchain toolWorkflow node so it can be connected as an ai_tool
+    to the AI Agent. The regular executeWorkflow node lacks the supplyData
+    interface that the agent requires.
+    """
     if tool.target_agent not in workflow_registry:
         raise ValueError(
             f"Agent '{tool.target_agent}' not found in workflow registry — is it deployed?"
         )
     return {
         "name": tool.name,
-        "type": "n8n-nodes-base.executeWorkflow",
-        "typeVersion": 1,
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
         "position": [400, 400],
         "parameters": {
-            "workflowId": workflow_registry[tool.target_agent],
+            "description": tool.description,
+            "source": "database",
+            "workflowId": {
+                "__rl": True,
+                "value": workflow_registry[tool.target_agent],
+                "mode": "id",
+            },
+            "workflowInputs": {
+                "mappingMode": "defineBelow",
+                "value": {
+                    "instructions": "={{ $fromAI('instructions', 'The task instructions to pass to the sub-workflow', 'string') }}",
+                },
+                "schema": [
+                    {
+                        "id": "instructions",
+                        "type": "string",
+                        "display": True,
+                        "required": True,
+                        "displayName": "instructions",
+                        "defaultMatch": False,
+                        "canBeUsedToMatch": True,
+                    },
+                ],
+                "matchingColumns": [],
+                "attemptToConvertTypes": False,
+                "convertFieldsToString": False,
+            },
         },
     }
 
