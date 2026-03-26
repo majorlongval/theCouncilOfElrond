@@ -1,4 +1,5 @@
 """Entry point: python -m council <config|deploy>."""
+import os
 import sys
 from pathlib import Path
 
@@ -113,7 +114,8 @@ def run_deploy(
         tools = resolve_tool_urls(tools, config)
         workflow = compile_workflow(agent, tools)
         _inject_credentials(workflow, telegram_cred_id, litellm_cred_id)
-        workflow_id = deployer.deploy(workflow)
+        activate = os.environ.get("COUNCIL_ACTIVATE", "false").lower() == "true"
+        workflow_id = deployer.deploy(workflow, activate=activate)
         workflow_registry[agent.name] = workflow_id
         print(f"[council] Deployed '{agent.name}' (id: {workflow_id})")
 
@@ -125,7 +127,7 @@ def run_deploy(
         tools = resolve_tool_urls(tools, config)
         workflow = compile_workflow(agent, tools, workflow_registry=workflow_registry)
         _inject_credentials(workflow, telegram_cred_id, litellm_cred_id)
-        workflow_id = deployer.deploy(workflow)
+        workflow_id = deployer.deploy(workflow, activate=activate)
         print(f"[council] Deployed '{agent.name}' (id: {workflow_id})")
 
     print(f"[council] Done — {len(agents)} agent(s) deployed.")
