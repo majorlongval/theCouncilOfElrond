@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 # Constrained string unions ensure only supported platform types are accepted.
 # Adding a new platform means extending these literals and the adapters that handle them.
-TriggerType = Literal["telegram", "webhook", "cron"]
+TriggerType = Literal["telegram", "webhook", "cron", "workflow"]
 ReplyType = Literal["telegram", "webhook"]
 
 

@@ -44,7 +44,8 @@ def test_gimli_callable_workflow_compiles():
     workflow = compile_workflow(agent, tools)
 
     node_types = [n["type"] for n in workflow["nodes"]]
-    assert "n8n-nodes-base.telegramTrigger" in node_types
+    # Workflow-only trigger — no Telegram Trigger
+    assert "n8n-nodes-base.telegramTrigger" not in node_types
     assert "n8n-nodes-base.executeWorkflowTrigger" in node_types
     set_nodes = [n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.set"]
-    assert len(set_nodes) == 2
+    assert len(set_nodes) == 1  # Only Normalize Workflow Input

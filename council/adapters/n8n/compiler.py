@@ -12,6 +12,7 @@ Workflow shape:
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from council.domain.agent import AgentDefinition, MemoryConfig
@@ -55,25 +56,39 @@ def _build_nodes(
 ) -> list[dict[str, Any]]:
     """Assemble the full node list for this workflow."""
     is_callable = agent.callable
+    is_workflow_only = agent.trigger.type == "workflow"
 
     nodes: list[dict[str, Any]] = [
-        _telegram_trigger_node(),
-        _ai_agent_node(agent, callable=is_callable),
+        _ai_agent_node(agent, callable=is_callable or is_workflow_only),
         _chat_model_node(agent.brain, litellm_base_url),
-        _reply_node(callable=is_callable),
     ]
 
-    if has_command:
-        nodes.append(_if_node(agent.trigger.command))  # type: ignore[arg-type]
-    else:
-        nodes.append(_negative_command_filter_node())
-
-    # Callable agents get a second entry point and normalization Set nodes
-    if is_callable:
+    if is_workflow_only:
+        # Workflow-only agents have no Telegram Trigger — only Execute Workflow
+        nodes.append(_execute_workflow_trigger_node())
+        nodes.append(_normalize_workflow_set_node())
+        nodes.append(_reply_if_guard_node())
+        nodes.append(_reply_node(callable=True))
+    elif is_callable:
+        # Callable agents have both Telegram and Execute Workflow entry points
+        nodes.append(_telegram_trigger_node())
+        nodes.append(_reply_node(callable=True))
         nodes.append(_execute_workflow_trigger_node())
         nodes.append(_normalize_telegram_set_node(agent.trigger.command))
         nodes.append(_normalize_workflow_set_node())
         nodes.append(_reply_if_guard_node())
+        if has_command:
+            nodes.append(_if_node(agent.trigger.command))  # type: ignore[arg-type]
+        else:
+            nodes.append(_negative_command_filter_node())
+    else:
+        # Standard agents — Telegram only
+        nodes.append(_telegram_trigger_node())
+        nodes.append(_reply_node(callable=False))
+        if has_command:
+            nodes.append(_if_node(agent.trigger.command))  # type: ignore[arg-type]
+        else:
+            nodes.append(_negative_command_filter_node())
 
     for tool in tools:
         if isinstance(tool, WorkflowTool):
@@ -93,6 +108,7 @@ def _telegram_trigger_node() -> dict[str, Any]:
         "type": "n8n-nodes-base.telegramTrigger",
         "typeVersion": 1.2,
         "position": [0, 0],
+        "webhookId": str(uuid.uuid4()),
         "parameters": {
             "updates": ["message"],
         },
@@ -452,9 +468,16 @@ def _build_connections(
     """
     agent_name = f"{agent.name} agent"
     is_callable = agent.callable
+    is_workflow_only = agent.trigger.type == "workflow"
     conns: dict[str, Any] = {}
 
-    if is_callable:
+    if is_workflow_only:
+        # -- Workflow-only: single entry via Execute Workflow Trigger
+        conns["Execute Workflow Trigger"] = _main_out("Normalize Workflow Input")
+        conns["Normalize Workflow Input"] = _main_out(agent_name)
+        conns[agent_name] = _main_out("Has chat_id?")
+        conns["Has chat_id?"] = _main_out("Reply")
+    elif is_callable:
         # -- Callable: both triggers feed through normalization Set nodes
         conns["Telegram Trigger"] = _main_out("Normalize Telegram Input")
         conns["Execute Workflow Trigger"] = _main_out("Normalize Workflow Input")

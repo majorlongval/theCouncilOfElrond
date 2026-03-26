@@ -35,8 +35,7 @@ artifacts = [
 ]
 
 [trigger]
-type = "telegram"
-command = "/run gimli"
+type = "workflow"
 
 [reply]
 type = "telegram"
