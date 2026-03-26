@@ -47,6 +47,13 @@ class N8nDeployer:
         existing_id = self._find_workflow_by_name(name)
 
         if existing_id:
+            # Deactivate first — updating an active workflow leaves webhooks
+            # in a broken state where n8n reports active=true but the Telegram
+            # webhook is not registered.
+            self._client.post(
+                f"/api/v1/workflows/{existing_id}/deactivate",
+                headers=self._headers(),
+            )
             resp = self._client.put(
                 f"/api/v1/workflows/{existing_id}",
                 headers=self._headers(),
