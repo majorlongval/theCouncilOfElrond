@@ -233,7 +233,7 @@ def _reply_node(*, callable: bool = False) -> dict[str, Any]:
         "position": [600, 0],
         "parameters": {
             "chatId": chat_id,
-            "text": "={{ $json.output }}",
+            "text": "={{ $json.output.slice(0, 4000) }}",
         },
     }
 
