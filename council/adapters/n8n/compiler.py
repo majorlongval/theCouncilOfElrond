@@ -356,6 +356,7 @@ def _tool_node(tool: HttpTool) -> dict[str, Any]:
     # -- Body (POST/PUT/PATCH with a JSON schema)
     if tool.body is not None:
         params["sendBody"] = True
+        params["specifyBody"] = "json"
         params["jsonBody"] = (
             "={{ /*n8n-auto-generated-fromAI-override*/ "
             "$fromAI('JSON', ``, 'json') }}"
