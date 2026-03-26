@@ -73,6 +73,9 @@ class N8nDeployer:
 
         Sub-workflow references may fail validation if a dependency was just
         published. A short retry loop handles this race condition.
+
+        Checks the response body for active=true, not just HTTP status, because
+        n8n can return 200 with active=false when validation fails silently.
         """
         for attempt in range(retries):
             resp = self._client.post(
@@ -80,8 +83,12 @@ class N8nDeployer:
                 headers=self._headers(),
             )
             if resp.is_success:
-                return
+                body = resp.json()
+                if body.get("active") is True:
+                    return
             if attempt < retries - 1:
                 time.sleep(delay)
-        # Final attempt failed — raise with error details
+        # Final attempt failed
         resp.raise_for_status()
+        # HTTP was 200 but workflow still not active
+        raise RuntimeError(f"Workflow {workflow_id} did not activate after {retries} attempts")

@@ -81,7 +81,7 @@ def test_deploy_activates_workflow(deployer, transport):
 
 def test_deployer_sends_api_key_header(deployer, transport):
     transport.add_response("POST", "/api/v1/workflows", 201, {"id": "abc"})
-    transport.add_response("POST", "/api/v1/workflows/abc/activate", 200, {"id": "abc"})
+    transport.add_response("POST", "/api/v1/workflows/abc/activate", 200, {"id": "abc", "active": True})
 
     deployer.deploy({"name": "Test", "nodes": [], "connections": {}, "settings": {}})
 
