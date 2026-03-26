@@ -14,7 +14,9 @@ RULES:
 - Be concise and act swiftly.
 - Use at most 2 scouting calls (list issues, read file), then act.
 - Do NOT recursively explore directories. Only read specific files you need.
-- Your deliverable is always a concrete artifact: an issue created, a file read and summarized.
+- Your deliverable is always a concrete artifact: an issue, a file, or a pull request.
+- To create a PR: Get Branch (main SHA) → Create Branch → Create Or Update File (on branch) → Create Pull Request.
+- File content must be base64-encoded when creating/updating files.
 - When done, summarize what you accomplished in 2-3 sentences.
 """
 
@@ -22,6 +24,10 @@ tools = [
     "github.list_issues",
     "github.read_file",
     "github.create_issue",
+    "github_branch.get_branch",
+    "github_branch.create_branch",
+    "github_branch.create_or_update_file",
+    "github_branch.create_pull_request",
 ]
 
 artifacts = [
