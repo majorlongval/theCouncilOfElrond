@@ -64,6 +64,7 @@ services:
       - N8N_API_URL=http://n8n:5678
       - COUNCIL_AGENTS_DIR=/app/agents
       - COUNCIL_CONFIG_PATH=/app/council.toml
+      - COUNCIL_ACTIVATE=true
     depends_on:
       n8n:
         condition: service_healthy
